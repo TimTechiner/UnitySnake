@@ -10,7 +10,7 @@ using Random = UnityEngine.Random;
 public class GameManager : MonoBehaviour
 {
     [SerializeField]
-    private GameObject fruitPrefab;
+    private FruitSpawner fruitSpawner;
 
     [SerializeField]
     private GameObject bodyPrefab;
@@ -33,20 +33,6 @@ public class GameManager : MonoBehaviour
 
     private Queue<BodySpawnData> bodySpawnQueue = new Queue<BodySpawnData>();
 
-    public class BodySpawnData
-    {
-        public Vector2Int Pos { get; set; }
-        public int SpawnDelay { get; set; }
-        public Snake Snake { get; set; }
-
-        public BodySpawnData(Vector2Int pos, int spawnDelay, Snake snake)
-        {
-            Pos = pos;
-            SpawnDelay = spawnDelay;
-            Snake = snake;
-        }
-    }
-
     private List<Vector2Int> field;
 
     public event EventHandler<OnBodySpawnedEventArgs> OnBodySpawned;
@@ -62,8 +48,15 @@ public class GameManager : MonoBehaviour
 
     private void Awake()
     {
+        InitializeField();
+
+        StartGame();
+    }
+
+    private void InitializeField()
+    {
         field = new List<Vector2Int>();
-        
+
         for (int i = 0; i < width; i++)
         {
             for (int j = 0; j < height; j++)
@@ -71,8 +64,6 @@ public class GameManager : MonoBehaviour
                 field.Add(new Vector2Int(i, j));
             }
         }
-
-        StartGame();
     }
 
     private void StartGame()
@@ -81,15 +72,27 @@ public class GameManager : MonoBehaviour
 
         SetScore(0);
 
-        SpawnFruit(new List<Vector2Int>() { new Vector2Int(width / 2, height / 2) });
+        SpawnFruit(null, Enumerable.Empty<Vector2Int>().ToList());
     }
 
     private void Start()
     {
-        snake.OnTurnChanged += Snake_OnTurnChanged;
+        snake.TurnChanged += Snake_OnTurnChanged;
+        snake.FruitEating += OnFruitEating;
+        snake.BodyCollided += OnBodyCollided;
     }
 
-    private void Snake_OnTurnChanged(object sender, Snake.OnTurnChangedEventArgs e)
+    private void OnBodyCollided(object sender, EventArgs e)
+    {
+        GameOver();
+    }
+
+    private void OnFruitEating(object sender, Snake.FruitEatingEventArgs e)
+    {
+        SpawnFruit(e.Fruit, e.OccupiedCells);
+    }
+
+    private void Snake_OnTurnChanged(object sender, Snake.TurnChangedEventArgs e)
     {
         if (bodySpawnQueue.Count == 0 || e.Turn < bodySpawnQueue.Peek().SpawnDelay) return;
 
@@ -125,14 +128,10 @@ public class GameManager : MonoBehaviour
         gameOverScreen.SetActive(true);
     }
 
-    public void SpawnFruit(List<Vector2Int> lockedSpaces)
+    public void SpawnFruit(GameObject fruit, List<Vector2Int> occupiedCells)
     {
-        var freeSpaces = field.Except(lockedSpaces).ToList();
-
-        var randomSpaceIndex = Random.RandomRange(0, freeSpaces.Count);
-        var randomSpace = freeSpaces[randomSpaceIndex];
-
-        Instantiate(fruitPrefab, new Vector3(randomSpace.x, randomSpace.y), transform.rotation);
+        fruitSpawner.Remove(fruit);
+        fruitSpawner.Spawn(field.Except(occupiedCells).ToList());
     }
 
     public void PutBodyInSpawnQueue(Vector2Int pos, int delay, Snake snake)

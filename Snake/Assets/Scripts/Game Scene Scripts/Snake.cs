@@ -26,12 +26,27 @@ public class Snake : SnakeElement
 
     public SnakeElement LastElement { get; private set; }
 
-    public event EventHandler<OnTurnChangedEventArgs> OnTurnChanged;
+    public event EventHandler<FruitEatingEventArgs> FruitEating;
 
-    public class OnTurnChangedEventArgs : EventArgs
+    public class FruitEatingEventArgs : EventArgs
+    {
+        public GameObject Fruit { get; private set; }
+        public List<Vector2Int> OccupiedCells { get; private set; }
+        public FruitEatingEventArgs(GameObject fruit, List<Vector2Int> occupiedCells)
+        {
+            Fruit = fruit;
+            OccupiedCells = occupiedCells;
+        }
+    }
+
+    public event EventHandler<EventArgs> BodyCollided;
+
+    public event EventHandler<TurnChangedEventArgs> TurnChanged;
+
+    public class TurnChangedEventArgs : EventArgs
     {
         public int Turn { get; private set; }
-        public OnTurnChangedEventArgs(int turn)
+        public TurnChangedEventArgs(int turn)
         {
             Turn = turn;
         }
@@ -39,9 +54,15 @@ public class Snake : SnakeElement
 
     private void Awake()
     {
-        gridPos = new Vector2Int(fieldSize / 2,  fieldSize / 2);
         movePeriod = 1f / speed;
         currentMoveTime = 0f;
+
+        Initialize();
+    }
+
+    public void Initialize()
+    {
+        gridPos = new Vector2Int(fieldSize / 2, fieldSize / 2);
         moveDirection = new Vector2Int(0, 0);
         length = 1;
         LastElement = this;
@@ -55,6 +76,13 @@ public class Snake : SnakeElement
     private void GameManager_OnBodySpawned(object sender, GameManager.OnBodySpawnedEventArgs e)
     {
         LastElement = e.Body;
+    }
+
+    public void AddBody(Body body)
+    {
+        LastElement.Child = body;
+        body.Parent = LastElement;
+        LastElement = body;
     }
 
     private void Update()
@@ -113,6 +141,7 @@ public class Snake : SnakeElement
         if (currentMoveTime >= movePeriod)
         {
             SnakeElement_OnMoved(this, new OnMovedEventArgs(gridPos));
+
             gridPos += moveDirection;
             var x = (gridPos.x + fieldSize) % fieldSize; 
             var y = (gridPos.y + fieldSize) % fieldSize; 
@@ -120,7 +149,7 @@ public class Snake : SnakeElement
             gridPos = new Vector2Int(x, y);
             currentMoveTime = 0;
 
-            OnTurnChanged?.Invoke(this, new OnTurnChangedEventArgs(++turn));
+            TurnChanged?.Invoke(this, new TurnChangedEventArgs(++turn));
 
             isInputBlocked = false;
         }
@@ -132,17 +161,15 @@ public class Snake : SnakeElement
     {
         if (other.gameObject.GetComponent<Fruit>() != null)
         {
-            gameManager.SetScore(other.gameObject.GetComponent<Fruit>().Scores);
-
-            Destroy(other.gameObject);
-            gameManager.SpawnFruit(GetOccupiedSpace().ToList());
+            FruitEatingEventArgs args = new FruitEatingEventArgs(other.gameObject, GetOccupiedSpace().ToList());
+            FruitEating?.Invoke(this, args);
 
             gameManager.PutBodyInSpawnQueue(gridPos, turn + length, this);
             length++;
         }
         else if (other.gameObject.GetComponent<Body>())
         {
-            gameManager.GameOver();
+            BodyCollided?.Invoke(this, EventArgs.Empty);
         }
     }
 
