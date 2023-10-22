@@ -8,6 +8,4 @@ public class Fruit : MonoBehaviour
     private int scores;
 
     public int Scores => scores;
-
-    private Vector2Int GridPos;
 }

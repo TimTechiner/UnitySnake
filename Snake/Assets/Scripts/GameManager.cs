@@ -21,6 +21,12 @@ public class GameManager : MonoBehaviour
     [SerializeField]
     private TextMeshProUGUI scoreText;
 
+    [SerializeField]
+    private GameObject gameOverScreen;
+
+    [SerializeField]
+    private TextMeshProUGUI gameOverScreenScoreText;
+
     private int width = 20;
     private int height = 20;
     private int score;
@@ -66,13 +72,19 @@ public class GameManager : MonoBehaviour
             }
         }
 
+        StartGame();
+    }
+
+    private void StartGame()
+    {
+        Time.timeScale = 1f;
+
         SetScore(0);
 
         SpawnFruit(new List<Vector2Int>() { new Vector2Int(width / 2, height / 2) });
     }
 
-    // Start is called before the first frame update
-    void Start()
+    private void Start()
     {
         snake.OnTurnChanged += Snake_OnTurnChanged;
     }
@@ -107,6 +119,10 @@ public class GameManager : MonoBehaviour
     public void GameOver()
     {
         Time.timeScale = 0f;
+        gameOverScreenScoreText.text = score.ToString();
+
+        scoreText.gameObject.SetActive(false);
+        gameOverScreen.SetActive(true);
     }
 
     public void SpawnFruit(List<Vector2Int> lockedSpaces)
