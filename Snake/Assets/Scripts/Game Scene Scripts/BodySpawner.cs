@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using static UnityEditor.PlayerSettings;
 
 public class BodySpawner : MonoBehaviour
 {
@@ -10,20 +9,35 @@ public class BodySpawner : MonoBehaviour
 
     private Queue<BodySpawnData> spawnQueue;
 
-    private void Awake()
+    private Snake snake;
+
+    public void Initialize(Snake snake)
     {
+        this.snake = snake;
         spawnQueue = new Queue<BodySpawnData>();
     }
 
-    public void AddToQueue(Vector2Int pos, int delay, Snake snake)
+    public void AddToQueue(Vector2Int pos, int delay)
     {
-        BodySpawnData bodySpawnData = new BodySpawnData(pos, delay, snake);
+        BodySpawnData bodySpawnData = new BodySpawnData(pos, delay);
         spawnQueue.Enqueue(bodySpawnData);
     } 
 
-    public void Spawn()
+    public void TrySpawn(int turn)
     {
+        if (spawnQueue.Count == 0 || turn < spawnQueue.Peek().SpawnDelay) return;
 
+        var bodySpawnData = spawnQueue.Dequeue();
+
+        var pos = bodySpawnData.Pos;
+
+        var spawnedBody = Instantiate(bodyPrefab, new Vector3(pos.x, pos.y), bodyPrefab.transform.rotation);
+
+        var body = spawnedBody.GetComponent<Body>();
+
+        snake.AddBody(body);
+
+        body.SetInitialPos(pos);
     }
 
     public void Remove(GameObject body)

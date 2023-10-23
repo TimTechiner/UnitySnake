@@ -10,9 +10,6 @@ public class Snake : SnakeElement
     [SerializeField]
     private float speed;
 
-    [SerializeField]
-    private GameManager gameManager;
-
     private Vector2Int moveDirection;
     private int fieldSize = 20;
 
@@ -32,17 +29,20 @@ public class Snake : SnakeElement
     {
         public GameObject Fruit { get; private set; }
         public List<Vector2Int> OccupiedCells { get; private set; }
-        public FruitEatingEventArgs(GameObject fruit, List<Vector2Int> occupiedCells)
+        public Vector2Int BodySpawnPosition { get; private set; }
+        public int BodySpawnDelay { get; private set; }
+        public FruitEatingEventArgs(GameObject fruit, List<Vector2Int> occupiedCells, Vector2Int bodySpawnPosition, int bodySpawnDelay)
         {
             Fruit = fruit;
             OccupiedCells = occupiedCells;
+            BodySpawnPosition = bodySpawnPosition;
+            BodySpawnDelay = bodySpawnDelay;
         }
     }
 
     public event EventHandler<EventArgs> BodyCollided;
 
     public event EventHandler<TurnChangedEventArgs> TurnChanged;
-
     public class TurnChangedEventArgs : EventArgs
     {
         public int Turn { get; private set; }
@@ -51,13 +51,21 @@ public class Snake : SnakeElement
             Turn = turn;
         }
     }
+    public event EventHandler<BodyClearedEventArgs> BodyCleared;
+    public class BodyClearedEventArgs : EventArgs
+    {
+        public List<Body> Bodies { get; private set; }
+
+        public BodyClearedEventArgs()
+        {
+            Bodies = new List<Body>();
+        }
+    }
 
     private void Awake()
     {
         movePeriod = 1f / speed;
         currentMoveTime = 0f;
-
-        Initialize();
     }
 
     public void Initialize()
@@ -66,16 +74,9 @@ public class Snake : SnakeElement
         moveDirection = new Vector2Int(0, 0);
         length = 1;
         LastElement = this;
-    }
 
-    private void Start()
-    {
-        gameManager.OnBodySpawned += GameManager_OnBodySpawned;
-    }
-
-    private void GameManager_OnBodySpawned(object sender, GameManager.OnBodySpawnedEventArgs e)
-    {
-        LastElement = e.Body;
+        ClearBodies();
+        this.Child = null;
     }
 
     public void AddBody(Body body)
@@ -96,7 +97,7 @@ public class Snake : SnakeElement
     {
         if (isInputBlocked) return;
 
-        if (Input.GetKeyDown(KeyCode.W))
+        if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
         {
             if (moveDirection.y != -1)
             {
@@ -105,7 +106,7 @@ public class Snake : SnakeElement
             }
             isInputBlocked = true;
         }
-        else if (Input.GetKeyDown(KeyCode.S)) 
+        else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) 
         {
             if (moveDirection.y != 1)
             {
@@ -114,7 +115,7 @@ public class Snake : SnakeElement
             }
             isInputBlocked = true;
         }
-        else if (Input.GetKeyDown(KeyCode.D))
+        else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
         {
             if (moveDirection.x != -1)
             {
@@ -123,7 +124,7 @@ public class Snake : SnakeElement
             }
             isInputBlocked = true;
         }
-        else if (Input.GetKeyDown(KeyCode.A))
+        else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
         {
             if (moveDirection.x != 1)
             {
@@ -161,10 +162,13 @@ public class Snake : SnakeElement
     {
         if (other.gameObject.GetComponent<Fruit>() != null)
         {
-            FruitEatingEventArgs args = new FruitEatingEventArgs(other.gameObject, GetOccupiedSpace().ToList());
+            FruitEatingEventArgs args = new FruitEatingEventArgs(
+                fruit: other.gameObject, 
+                occupiedCells: GetOccupiedSpace().ToList(), 
+                bodySpawnPosition: gridPos, 
+                bodySpawnDelay: turn + length);
             FruitEating?.Invoke(this, args);
 
-            gameManager.PutBodyInSpawnQueue(gridPos, turn + length, this);
             length++;
         }
         else if (other.gameObject.GetComponent<Body>())
@@ -184,5 +188,24 @@ public class Snake : SnakeElement
         }
 
         yield return snakeElement.gridPos;
+    }
+
+    private void ClearBodies()
+    {
+        BodyClearedEventArgs args = new BodyClearedEventArgs();
+
+        var body = this.Child;
+
+        if (body == null) return;
+
+        while (body.Child != null)
+        {
+            args.Bodies.Add(body as Body);
+            body = body.Child;
+        }
+
+        args.Bodies.Add(body as Body);
+
+        BodyCleared?.Invoke(this, args);
     }
 }
